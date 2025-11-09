@@ -5,37 +5,37 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-// --- CONFIGURAÇÕES GERAIS (MODIFIQUE AQUI) ---
+// --- Configs gerais ---
 #define SCREEN_W 800
 #define SCREEN_H 600
 #define FPS 60.0
 
-// CORES (R, G, B)
+// cores
 #define COLOR_PLAYER al_map_rgb(50, 255, 50)
 #define COLOR_ENEMY  al_map_rgb(255, 50, 50)
 #define COLOR_BULLET al_map_rgb(255, 255, 0)
 #define COLOR_BG     al_map_rgb(0, 0, 0)
 
-// JOGADOR
+// player
 #define PLAYER_W 40
 #define PLAYER_H 20
 #define PLAYER_SPEED 5.0
 
-// BALA
+// tiros
 #define BULLET_W 4
 #define BULLET_H 10
 #define BULLET_SPEED 10.0
-#define MAX_BULLETS 3 // Máximo de tiros na tela ao mesmo tempo
+#define MAX_BULLETS 3 // tiros na tela ao mesmo tempo
 
-// INIMIGOS
+// inimigos
 #define ENEMY_W 30
 #define ENEMY_H 20
 #define ENEMY_ROWS 5
 #define ENEMY_COLS 11
-#define ENEMY_START_SPEED 1.0
-#define ENEMY_DROP_SPEED 10.0 // Quanto eles descem ao bater na borda
+#define ENEMY_START_SPEED 3.0 // velocidade inicial dos inimigos, podemos aumentar isso conforme o nivel
+#define ENEMY_DROP_SPEED 10.0 // quanto os inimigos descem 
 
-// --- ESTRUTURAS ---
+// struct's
 typedef struct {
     float x, y;
     int w, h;
@@ -55,7 +55,7 @@ typedef struct {
     int score;
 } Player;
 
-// --- GLOBAIS (Para facilitar este script básico) ---
+// def. globais
 Player player;
 Bullet bullets[MAX_BULLETS];
 Enemy enemies[ENEMY_ROWS][ENEMY_COLS];
@@ -63,9 +63,7 @@ float enemy_dx = ENEMY_START_SPEED;
 bool game_over = false;
 int enemies_remaining;
 
-// --- FUNÇÕES AUXILIARES ---
-
-// Inicializa o jogo
+// inicializar
 void init_game() {
     player.w = PLAYER_W;
     player.h = PLAYER_H;
@@ -102,30 +100,30 @@ void fire_bullet() {
             bullets[i].w = BULLET_W;
             bullets[i].h = BULLET_H;
             bullets[i].active = true;
-            break; // Atira apenas uma por vez
+            break; 
         }
     }
 }
 
-// Verifica colisão simples (caixa contra caixa)
-bool check_collision(float x1, float y1, int w1, int h1, float x2, float y2, int w2, int h2) {
+// inimigo encostar na nave
+bool colisao(float x1, float y1, int w1, int h1, float x2, float y2, int w2, int h2) {
     return (x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2);
 }
 
-void update_logic() {
+void logica() {
     if (game_over) return;
 
-    // Atualiza balas
+    // Atualiza municao
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (bullets[i].active) {
             bullets[i].y -= BULLET_SPEED;
             if (bullets[i].y < 0) bullets[i].active = false;
 
-            // Colisão Bala vs Inimigo
+            // disparo no inimigo
             for (int r = 0; r < ENEMY_ROWS; r++) {
                 for (int c = 0; c < ENEMY_COLS; c++) {
                     if (enemies[r][c].alive && bullets[i].active) {
-                        if (check_collision(bullets[i].x, bullets[i].y, bullets[i].w, bullets[i].h,
+                        if (colisao(bullets[i].x, bullets[i].y, bullets[i].w, bullets[i].h,
                                             enemies[r][c].x, enemies[r][c].y, enemies[r][c].w, enemies[r][c].h)) {
                             enemies[r][c].alive = false;
                             bullets[i].active = false;
@@ -138,17 +136,17 @@ void update_logic() {
         }
     }
 
-    // Atualiza inimigos
+    // atualizar os inimigos
     bool touch_edge = false;
     for (int r = 0; r < ENEMY_ROWS; r++) {
         for (int c = 0; c < ENEMY_COLS; c++) {
             if (enemies[r][c].alive) {
                 enemies[r][c].x += enemy_dx;
-                // Verifica se algum inimigo tocou a borda
+                // inimigo na borda
                 if (enemies[r][c].x <= 0 || enemies[r][c].x + ENEMY_W >= SCREEN_W) {
                     touch_edge = true;
                 }
-                // Verifica se inimigo chegou no jogador (Game Over)
+                // inimigo atinge o jogador
                 if (enemies[r][c].y + ENEMY_H >= player.y) {
                     game_over = true;
                 }
@@ -157,29 +155,29 @@ void update_logic() {
     }
 
     if (touch_edge) {
-        enemy_dx = -enemy_dx; // Inverte direção
+        enemy_dx = -enemy_dx; // mudado a direcao dos inimigos
         for (int r = 0; r < ENEMY_ROWS; r++) {
             for (int c = 0; c < ENEMY_COLS; c++) {
-                enemies[r][c].y += ENEMY_DROP_SPEED; // Todos descem
+                enemies[r][c].y += ENEMY_DROP_SPEED; // descendo os inimigos
             }
         }
     }
 
     if (enemies_remaining == 0) {
-        // Vitória (ou reinício de nível) - por enquanto apenas reseta
+        //reset
         init_game();
-        enemy_dx += 0.5; // Aumenta dificuldade
+        
     }
 }
 
-void draw_game(ALLEGRO_FONT* font) {
+void graficos(ALLEGRO_FONT* font) {
     al_clear_to_color(COLOR_BG);
 
     if (!game_over) {
-        // Desenha Player (substitua por al_draw_bitmap depois)
+        // player
         al_draw_filled_rectangle(player.x, player.y, player.x + player.w, player.y + player.h, COLOR_PLAYER);
 
-        // Desenha Inimigos
+        // enemy
         for (int r = 0; r < ENEMY_ROWS; r++) {
             for (int c = 0; c < ENEMY_COLS; c++) {
                 if (enemies[r][c].alive) {
@@ -190,7 +188,7 @@ void draw_game(ALLEGRO_FONT* font) {
             }
         }
 
-        // Desenha Balas
+        // municao
         for (int i = 0; i < MAX_BULLETS; i++) {
             if (bullets[i].active) {
                 al_draw_filled_rectangle(bullets[i].x, bullets[i].y,
@@ -199,18 +197,18 @@ void draw_game(ALLEGRO_FONT* font) {
             }
         }
 
-        // HUD
-        al_draw_textf(font, al_map_rgb(255, 255, 255), 10, 10, 0, "Score: %d", player.score);
+        // infos
+        al_draw_textf(font, al_map_rgb(255, 255, 255), 10, 10, 0, "Pontuacao: %d", player.score);
 
     } else {
         // Tela de Game Over
-        al_draw_text(font, al_map_rgb(255, 0, 0), SCREEN_W / 2, SCREEN_H / 2, ALLEGRO_ALIGN_CENTER, "GAME OVER - Press R to restart");
+        al_draw_text(font, al_map_rgb(255, 0, 0), SCREEN_W / 2, SCREEN_H / 2, ALLEGRO_ALIGN_CENTER, "Perdeu otario --> se quiser jogar dnv aperta R");
     }
 
     al_flip_display();
 }
 
-// --- MAIN ---
+// main --> so isso deve estar em main, o restante precisa ser modularizado 
 int main() {
     if (!al_init()) return -1;
     al_install_keyboard();
@@ -221,7 +219,6 @@ int main() {
     ALLEGRO_DISPLAY* display = al_create_display(SCREEN_W, SCREEN_H);
     ALLEGRO_EVENT_QUEUE* queue = al_create_event_queue();
     ALLEGRO_TIMER* timer = al_create_timer(1.0 / FPS);
-    // Fonte padrão simples embutida do Allegro
     ALLEGRO_FONT* font = al_create_builtin_font();
 
     al_register_event_source(queue, al_get_keyboard_event_source());
@@ -245,9 +242,9 @@ int main() {
                 if (key[ALLEGRO_KEY_RIGHT] && player.x < SCREEN_W - player.w) player.x += PLAYER_SPEED;
                 if (key[ALLEGRO_KEY_SPACE]) {
                      fire_bullet();
-                     key[ALLEGRO_KEY_SPACE] = false; // Evita tiro contínuo se segurar
+                     key[ALLEGRO_KEY_SPACE] = false; // nao permite disparos simultaneos 
                 }
-                update_logic();
+                logica();
             } else {
                 if (key[ALLEGRO_KEY_R]) init_game();
             }
@@ -257,14 +254,15 @@ int main() {
         } else if (event.type == ALLEGRO_EVENT_KEY_DOWN) {
             key[event.keyboard.keycode] = true;
         } else if (event.type == ALLEGRO_EVENT_KEY_UP) {
-             // Soltura especial para barra de espaço permitir "tapas" rápidos
+             // segundo o Gemini, isso permite dar cliques mais rapidos na tecla de espaco
+             // antes dessa alteracao os tiros estavam meio nerfados, muito lento 
             if (event.keyboard.keycode != ALLEGRO_KEY_SPACE) {
                 key[event.keyboard.keycode] = false;
             }
         }
 
         if (redraw && al_is_event_queue_empty(queue)) {
-            draw_game(font);
+            graficos(font);
             redraw = false;
         }
     }
