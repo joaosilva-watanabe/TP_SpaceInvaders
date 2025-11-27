@@ -37,6 +37,7 @@
 #define ENEMY_COLS 11
 #define ENEMY_START_SPEED 3.0
 #define ENEMY_DROP_SPEED 10.0
+#define SPEED_INCREMENT 0.5 
 
 // animacao
 #define EXPLOSION_ANIMATION_SPEED 8
@@ -114,6 +115,7 @@ Explosion explosions[MAX_EXPLOSIONS];
 ALLEGRO_BITMAP* background = NULL;
 float enemy_dx = ENEMY_START_SPEED;
 int enemies_remaining;
+int level = 1; 
 
 // Variaveis de controle de estado e recordes
 GameState state = STATE_MENU;
@@ -234,7 +236,9 @@ void reset_level() {
             enemies_remaining++;
         }
     }
-    enemy_dx = ENEMY_START_SPEED;
+    
+    // <--- ALTERADO: Velocidade agora depende do nível
+    enemy_dx = ENEMY_START_SPEED + ((level - 1) * SPEED_INCREMENT);
 }
 
 void start_new_game() {
@@ -242,6 +246,7 @@ void start_new_game() {
     player.h = PLAYER_H;
     player.lives = 3;
     player.score = 0;
+    level = 1; // Reseta para 1 quando começar novo jogo
     reset_level();
     state = STATE_PLAYING;
 }
@@ -395,6 +400,7 @@ void logica() {
     }
 
     if (enemies_remaining == 0) {
+        level++; // Aumenta o nivel quando termina a fase
         reset_level();
     }
 }
@@ -460,13 +466,13 @@ void graficos(ALLEGRO_FONT* font) {
             }
         }
         
-        // Exibe o nome de quem esta jogando
-    al_draw_multiline_textf(
-    font, al_map_rgb(255, 255, 255), 10, 10, 800, al_get_font_line_height(font), 0, "Jogador: %s\n \nPontos: %d", input_name, player.score
-);
+        // Exibe o nome, pontuacao e nivel 
+        al_draw_multiline_textf(
+        font, al_map_rgb(255, 255, 255), 10, 10, 800, al_get_font_line_height(font), 0, "Jogador: %s\n \nPontos: %d\n \nNível: %d", input_name, player.score, level
+    );
     } else if (state == STATE_GAME_OVER) {
         al_draw_text(font, al_map_rgb(255, 0, 0), SCREEN_W / 2, SCREEN_H / 2 - 20, ALLEGRO_ALIGN_CENTER, "GAME OVER");
-        al_draw_textf(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, SCREEN_H / 2 + 20, ALLEGRO_ALIGN_CENTER, "%s fez %d pontos", input_name, player.score);
+        al_draw_textf(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, SCREEN_H / 2 + 20, ALLEGRO_ALIGN_CENTER, "%s fez %d pontos (Nível %d)", input_name, player.score, level); // <--- Mostra o nível no game over também
         al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, SCREEN_H / 2 + 60, ALLEGRO_ALIGN_CENTER, "Pressione R --> Menu");
     }
 
