@@ -19,6 +19,11 @@
 #define COLOR_BULLET al_map_rgb(255, 255, 0)
 #define COLOR_BG     al_map_rgb(0, 0, 0)
 
+// Cores Power Ups
+#define COLOR_ENERGY_BAR al_map_rgb(0, 200, 255)
+#define COLOR_FREEZE     al_map_rgb(100, 100, 255) 
+#define COLOR_RAILGUN    al_map_rgb(0, 255, 255)   
+
 // player
 #define PLAYER_W 64
 #define PLAYER_H 64
@@ -28,7 +33,7 @@
 #define BULLET_W 4
 #define BULLET_H 10
 #define BULLET_SPEED 10.0
-#define MAX_BULLETS 3
+#define MAX_BULLETS 20 
 
 // inimigos
 #define ENEMY_W 40
@@ -46,18 +51,28 @@
 #define ANIMATION_SPEED 20 
 #define NUM_FRAMES 2 
 
-// Configuracao de High Scores
+// configs high score
 #define MAX_HIGHSCORES 5
 #define SCORE_FILENAME "records.bin" 
 #define MAX_NAME_LEN 10
 
+// configs power ups 
+#define MAX_ENERGY 100
+#define ENERGY_PER_KILL 5     // Quanto ganha por matar inimigo
+#define COST_MULTISHOT 20
+#define COST_RAILGUN 50     
+#define COST_FREEZE 100
+
+#define FREEZE_DURATION 180   // tempo que os inimigos ficam comgelados (em frames)
+#define RAILGUN_VISUAL_TIME 15 // tempo de tela do laser
+
 // Estados do Jogo
 typedef enum {
-    STATE_MENU, // janela de menu 
-    STATE_INPUT_NAME, // janela do input do nome do player 
-    STATE_PLAYING, // jogo operando 
-    STATE_GAME_OVER, // fim de jogo 
-    STATE_HIGHSCORES // janela de scores 
+    STATE_MENU, 
+    STATE_INPUT_NAME, 
+    STATE_PLAYING, 
+    STATE_GAME_OVER, 
+    STATE_HIGHSCORES 
 } GameState;
 
 typedef struct {
@@ -68,6 +83,7 @@ typedef struct {
 // structs do jogo
 typedef struct {
     float x, y;
+    float dx, dy; // ajuste de angulo para os tiros multiplos
     int w, h;
     bool active;
 } Bullet;
@@ -83,6 +99,7 @@ typedef struct {
     int w, h;
     int lives;
     int score;
+    int energy; 
 } Player;
 
 typedef struct {
@@ -117,9 +134,14 @@ float enemy_dx = ENEMY_START_SPEED;
 int enemies_remaining;
 int level = 1; 
 
+// Variaveis globais de Power Ups
+int freeze_timer = 0;        
+int railgun_timer = 0;       
+float railgun_x_pos = 0;     
+
 // Variaveis de controle de estado e recordes
 GameState state = STATE_MENU;
-Record high_scores[MAX_HIGHSCORES]; // array de structs -> nome do player e pontuacao
+Record high_scores[MAX_HIGHSCORES]; 
 int menu_option = 0; 
 
 // Variaveis para captura de nome
@@ -133,7 +155,6 @@ void load_scores() {
         fread(high_scores, sizeof(Record), MAX_HIGHSCORES, file);
         fclose(file);
     } else {
-        // Se nao existir nomes, zera tudo e coloca nomes padrao
         for(int i=0; i<MAX_HIGHSCORES; i++) {
             high_scores[i].score = 0;
             sprintf(high_scores[i].name, "Vazio");
@@ -149,24 +170,17 @@ void save_scores() {
     }
 }
 
-// Compara scores para o qsort (decrescente)
 int compare_scores(const void *a, const void *b) {
     Record *recA = (Record *)a;
     Record *recB = (Record *)b;
     return (recB->score - recA->score);
 }
 
-// Adiciona score e nome
 void add_score(int score, const char* player_name) {
-    // Verifica se entra no ranking 
     if (score > high_scores[MAX_HIGHSCORES - 1].score) {
         high_scores[MAX_HIGHSCORES - 1].score = score;
-        
-        // Copia o nome
         strncpy(high_scores[MAX_HIGHSCORES - 1].name, player_name, MAX_NAME_LEN);
-        high_scores[MAX_HIGHSCORES - 1].name[MAX_NAME_LEN] = '\0'; // terminador 
-
-        // Ordenacao
+        high_scores[MAX_HIGHSCORES - 1].name[MAX_NAME_LEN] = '\0'; 
         qsort(high_scores, MAX_HIGHSCORES, sizeof(Record), compare_scores);
         save_scores();
     }
@@ -221,6 +235,10 @@ bool init_background(const char* filename) {
 void reset_level() {
     player.x = SCREEN_W / 2 - player.w / 2;
     player.y = SCREEN_H - 60;
+    
+    // Reseta timers de powerup ao mudar de nivel ou reiniciar
+    freeze_timer = 0;
+    railgun_timer = 0;
 
     for (int i = 0; i < MAX_BULLETS; i++) bullets[i].active = false;
     for (int i = 0; i < MAX_EXPLOSIONS; i++) explosions[i].active = false;
@@ -236,8 +254,6 @@ void reset_level() {
             enemies_remaining++;
         }
     }
-    
-    // <--- ALTERADO: Velocidade agora depende do nível
     enemy_dx = ENEMY_START_SPEED + ((level - 1) * SPEED_INCREMENT);
 }
 
@@ -246,19 +262,17 @@ void start_new_game() {
     player.h = PLAYER_H;
     player.lives = 3;
     player.score = 0;
-    level = 1; // Reseta para 1 quando começar novo jogo
+    player.energy = 0; // Começa com 0 de energia
+    level = 1; 
     reset_level();
     state = STATE_PLAYING;
 }
 
-//Prepara o estado de input
 void start_input_name() {
     state = STATE_INPUT_NAME;
     memset(input_name, 0, sizeof(input_name));
     input_pos = 0;
 }
-
-// Logica do Jogo 
 
 void create_explosion(float x, float y) {
     for (int i = 0; i < MAX_EXPLOSIONS; i++) {
@@ -269,6 +283,75 @@ void create_explosion(float x, float y) {
             explosions[i].frame_counter = 0;
             explosions[i].active = true;
             break;
+        }
+    }
+}
+
+// --- LOGICA DOS POWER UPS ---
+
+// auxiliar para disparar um unico projetil com direcao
+void spawn_bullet(float x, float y, float dx, float dy) {
+    for (int i = 0; i < MAX_BULLETS; i++) {
+        if (!bullets[i].active) {
+            bullets[i].x = x;
+            bullets[i].y = y;
+            bullets[i].dx = dx;
+            bullets[i].dy = dy;
+            bullets[i].w = BULLET_W;
+            bullets[i].h = BULLET_H;
+            bullets[i].active = true;
+            break; 
+        }
+    }
+}
+
+void fire_standard_bullet() {
+    // Tiro normal: centralizado e reto
+    spawn_bullet(player.x + (player.w / 2) - (BULLET_W / 2), player.y, 0, -BULLET_SPEED);
+}
+
+void activate_powerup(int type) {
+    if (type == 1) { // Multi-Shot
+        if (player.energy >= COST_MULTISHOT) {
+            player.energy -= COST_MULTISHOT;
+            float cx = player.x + (player.w / 2) - (BULLET_W / 2);
+            spawn_bullet(cx, player.y, 0, -BULLET_SPEED);      // Centro
+            spawn_bullet(cx, player.y, -2.0, -BULLET_SPEED);   // Esquerda
+            spawn_bullet(cx, player.y, 2.0, -BULLET_SPEED);    // Direita
+        }
+    } 
+    else if (type == 2) { // Rail Gun
+        if (player.energy >= COST_RAILGUN) {
+            player.energy -= COST_RAILGUN;
+            railgun_timer = RAILGUN_VISUAL_TIME;
+            railgun_x_pos = player.x + (player.w / 2);
+
+            // Logica de destruicao da coluna
+            // Definimos a area do tiro do player (uma linha vertical)
+            float beam_x = railgun_x_pos;
+            float beam_w = 10; // largura do feixe logico
+
+            for (int r = 0; r < ENEMY_ROWS; r++) {
+                for (int c = 0; c < ENEMY_COLS; c++) {
+                    if (enemies[r][c].alive) {
+                        // Verifica se o inimigo esta na linha horizontal do tiro
+                        if (enemies[r][c].x < beam_x + beam_w && 
+                            enemies[r][c].x + enemies[r][c].w > beam_x - beam_w) {
+                            
+                            enemies[r][c].alive = false;
+                            create_explosion(enemies[r][c].x, enemies[r][c].y);
+                            player.score += 10;
+                            enemies_remaining--;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    else if (type == 3) { // Time Freeze
+        if (player.energy >= COST_FREEZE) {
+            player.energy -= COST_FREEZE;
+            freeze_timer = FREEZE_DURATION;
         }
     }
 }
@@ -289,28 +372,19 @@ void update_explosions() {
 }
 
 void update_animation() {
-    enemy_sprites.frame_counter++;
-    if (enemy_sprites.frame_counter >= ANIMATION_SPEED) {
-        enemy_sprites.frame_counter = 0;
-        enemy_sprites.current_frame = (enemy_sprites.current_frame + 1) % NUM_FRAMES;
+    // Se estiver congelado, nao atualiza animacao dos inimigos
+    if (freeze_timer == 0) {
+        enemy_sprites.frame_counter++;
+        if (enemy_sprites.frame_counter >= ANIMATION_SPEED) {
+            enemy_sprites.frame_counter = 0;
+            enemy_sprites.current_frame = (enemy_sprites.current_frame + 1) % NUM_FRAMES;
+        }
     }
+    
     player_sprites.frame_counter++;
     if (player_sprites.frame_counter >= ANIMATION_SPEED) {
         player_sprites.frame_counter = 0;
         player_sprites.current_frame = (player_sprites.current_frame + 1) % NUM_FRAMES;
-    }
-}
-
-void fire_bullet() {
-    for (int i = 0; i < MAX_BULLETS; i++) {
-        if (!bullets[i].active) {
-            bullets[i].x = player.x + (player.w / 2) - (BULLET_W / 2);
-            bullets[i].y = player.y;
-            bullets[i].w = BULLET_W;
-            bullets[i].h = BULLET_H;
-            bullets[i].active = true;
-            break; 
-        }
     }
 }
 
@@ -346,20 +420,33 @@ void logica() {
     update_animation();
     update_explosions();
 
+    // Atualiza timers de powerups
+    if (freeze_timer > 0) freeze_timer--;
+    if (railgun_timer > 0) railgun_timer--;
+
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (bullets[i].active) {
-            bullets[i].y -= BULLET_SPEED;
-            if (bullets[i].y < 0) bullets[i].active = false;
+            // Atualiza posicao com dx e dy
+            bullets[i].y += bullets[i].dy;
+            bullets[i].x += bullets[i].dx;
+
+            if (bullets[i].y < 0 || bullets[i].x < 0 || bullets[i].x > SCREEN_W) bullets[i].active = false;
 
             for (int r = 0; r < ENEMY_ROWS; r++) {
                 for (int c = 0; c < ENEMY_COLS; c++) {
                     if (enemies[r][c].alive && bullets[i].active) {
                         if (colisao(bullets[i].x, bullets[i].y, bullets[i].w, bullets[i].h,
                                     enemies[r][c].x, enemies[r][c].y, enemies[r][c].w, enemies[r][c].h)) {
+                            
                             create_explosion(enemies[r][c].x, enemies[r][c].y);
                             enemies[r][c].alive = false;
                             bullets[i].active = false;
                             player.score += 10;
+                            
+                            // Ganha energia
+                            player.energy += ENERGY_PER_KILL;
+                            if (player.energy > MAX_ENERGY) player.energy = MAX_ENERGY;
+
                             enemies_remaining--;
                         }
                     }
@@ -368,39 +455,42 @@ void logica() {
         }
     }
 
-    bool touch_edge = false;
-    bool game_over_trigger = false;
+    // Movimentacao dos inimigos (So move se nao estiver congelado)
+    if (freeze_timer == 0) {
+        bool touch_edge = false;
+        bool game_over_trigger = false;
 
-    for (int r = 0; r < ENEMY_ROWS; r++) {
-        for (int c = 0; c < ENEMY_COLS; c++) {
-            if (enemies[r][c].alive) {
-                enemies[r][c].x += enemy_dx;
-                if (enemies[r][c].x <= 0 || enemies[r][c].x + ENEMY_W >= SCREEN_W) {
-                    touch_edge = true;
-                }
-                if (enemies[r][c].y + ENEMY_H >= player.y) {
-                    game_over_trigger = true;
-                }
-            }
-        }
-    }
-
-    if (touch_edge) {
-        enemy_dx = -enemy_dx;
         for (int r = 0; r < ENEMY_ROWS; r++) {
             for (int c = 0; c < ENEMY_COLS; c++) {
-                enemies[r][c].y += ENEMY_DROP_SPEED;
+                if (enemies[r][c].alive) {
+                    enemies[r][c].x += enemy_dx;
+                    if (enemies[r][c].x <= 0 || enemies[r][c].x + ENEMY_W >= SCREEN_W) {
+                        touch_edge = true;
+                    }
+                    if (enemies[r][c].y + ENEMY_H >= player.y) {
+                        game_over_trigger = true;
+                    }
+                }
             }
         }
-    }
 
-    if (game_over_trigger) {
-        add_score(player.score, input_name);
-        state = STATE_GAME_OVER;
+        if (touch_edge) {
+            enemy_dx = -enemy_dx;
+            for (int r = 0; r < ENEMY_ROWS; r++) {
+                for (int c = 0; c < ENEMY_COLS; c++) {
+                    enemies[r][c].y += ENEMY_DROP_SPEED;
+                }
+            }
+        }
+
+        if (game_over_trigger) {
+            add_score(player.score, input_name);
+            state = STATE_GAME_OVER;
+        }
     }
 
     if (enemies_remaining == 0) {
-        level++; // Aumenta o nivel quando termina a fase
+        level++; 
         reset_level();
     }
 }
@@ -422,23 +512,14 @@ void graficos(ALLEGRO_FONT* font) {
         al_draw_text(font, al_map_rgb(150, 150, 150), SCREEN_W/2, 500, ALLEGRO_ALIGN_CENTER, "Use SETAS e ENTER");
 
     } else if (state == STATE_INPUT_NAME) {
-        // Desenha tela de input
         al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W/2, 200, ALLEGRO_ALIGN_CENTER, "DIGITE SEU NOME:");
-        
-        // Desenha caixa de texto
         al_draw_rectangle(SCREEN_W/2 - 100, 240, SCREEN_W/2 + 100, 280, al_map_rgb(0, 255, 0), 2);
-        
-        // Desenha o nome que está sendo digitado e um cursor piscante 
         al_draw_textf(font, al_map_rgb(255, 255, 0), SCREEN_W/2, 250, ALLEGRO_ALIGN_CENTER, "%s_", input_name);
-
         al_draw_text(font, al_map_rgb(150, 150, 150), SCREEN_W/2, 350, ALLEGRO_ALIGN_CENTER, "Pressione ENTER para iniciar");
-        al_draw_text(font, al_map_rgb(150, 150, 150), SCREEN_W/2, 370, ALLEGRO_ALIGN_CENTER, "Pressione ESC para voltar");
 
     } else if (state == STATE_HIGHSCORES) {
         al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W/2, 100, ALLEGRO_ALIGN_CENTER, "TOP 5 RECORDES");
-        
         for(int i=0; i<MAX_HIGHSCORES; i++) {
-            // Exibe Nome e Score
             al_draw_textf(font, al_map_rgb(50, 255, 50), SCREEN_W/2, 200 + (i * 40), ALLEGRO_ALIGN_CENTER, 
                           "%d. %-10s ..... %05d", i+1, high_scores[i].name, high_scores[i].score);
         }
@@ -451,7 +532,13 @@ void graficos(ALLEGRO_FONT* font) {
             for (int c = 0; c < ENEMY_COLS; c++) {
                 if (enemies[r][c].alive) {
                     if (enemy_sprites.spritesheet) {
-                        al_draw_bitmap(enemy_sprites.frames[enemy_sprites.current_frame], enemies[r][c].x, enemies[r][c].y, 0);
+                        // Se estiver congelado, desenha com outra cor
+                        if (freeze_timer > 0) {
+                            al_draw_tinted_bitmap(enemy_sprites.frames[enemy_sprites.current_frame], 
+                                                  COLOR_FREEZE, enemies[r][c].x, enemies[r][c].y, 0);
+                        } else {
+                            al_draw_bitmap(enemy_sprites.frames[enemy_sprites.current_frame], enemies[r][c].x, enemies[r][c].y, 0);
+                        }
                     } else {
                         al_draw_filled_rectangle(enemies[r][c].x, enemies[r][c].y,
                             enemies[r][c].x + enemies[r][c].w, enemies[r][c].y + enemies[r][c].h, COLOR_ENEMY);
@@ -459,20 +546,53 @@ void graficos(ALLEGRO_FONT* font) {
                 }
             }
         }
+        
         draw_explosions();
+        
+        // Desenha Laser da Rail Gun se ativo
+        if (railgun_timer > 0) {
+            al_draw_filled_rectangle(railgun_x_pos - 5, 0, railgun_x_pos + 5, player.y, COLOR_RAILGUN);
+            // Efeito de brilho externo
+            al_draw_rectangle(railgun_x_pos - 8, 0, railgun_x_pos + 8, player.y, al_map_rgba(255, 255, 255, 100), 2);
+        }
+
         for (int i = 0; i < MAX_BULLETS; i++) {
             if (bullets[i].active) {
                 al_draw_filled_rectangle(bullets[i].x, bullets[i].y, bullets[i].x + bullets[i].w, bullets[i].y + bullets[i].h, COLOR_BULLET);
             }
         }
         
-        // Exibe o nome, pontuacao e nivel 
-        al_draw_multiline_textf(
-        font, al_map_rgb(255, 255, 255), 10, 10, 800, al_get_font_line_height(font), 0, "Jogador: %s\n \nPontos: %d\n \nNível: %d", input_name, player.score, level
-    );
+        // HUD - Infos Esquerda
+        al_draw_multiline_textf(font, al_map_rgb(255, 255, 255), 10, 10, 800, al_get_font_line_height(font), 0, "Jogador: %s\n \nPontos: %d\n \nNível: %d", input_name, player.score, level);
+
+        // HUD - Legenda Power Ups (Centro Superior)
+        al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, 10, ALLEGRO_ALIGN_CENTER, "[1] Multi (20)  [2] RailGun (50)  [3] Freeze (100)");
+
+        // HUD - Barra de Energia (Direita Superior)
+        float bar_w = 150;
+        float bar_h = 20;
+        float bar_x = SCREEN_W - bar_w - 10;
+        float bar_y = 10;
+        
+        // Borda da barra
+        al_draw_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, al_map_rgb(255, 255, 255), 2);
+        
+        // Preenchimento da barra baseado na energia 
+        float fill_w = (float)player.energy / MAX_ENERGY * bar_w;
+        al_draw_filled_rectangle(bar_x, bar_y, bar_x + fill_w, bar_y + bar_h, COLOR_ENERGY_BAR);
+        
+        // Texto sobre a barra
+        int font_h = al_get_font_line_height(font); // Pega a altura da fonte
+        float text_y = bar_y + (bar_h - font_h) / 2; // Calcula o centro vertical
+        
+        al_draw_textf(font, al_map_rgb(255, 255, 255), 
+                      bar_x + bar_w/2, 
+                      text_y, 
+                      ALLEGRO_ALIGN_CENTER, "%d/%d", player.energy, MAX_ENERGY);
+
     } else if (state == STATE_GAME_OVER) {
         al_draw_text(font, al_map_rgb(255, 0, 0), SCREEN_W / 2, SCREEN_H / 2 - 20, ALLEGRO_ALIGN_CENTER, "GAME OVER");
-        al_draw_textf(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, SCREEN_H / 2 + 20, ALLEGRO_ALIGN_CENTER, "%s fez %d pontos (Nível %d)", input_name, player.score, level); // <--- Mostra o nível no game over também
+        al_draw_textf(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, SCREEN_H / 2 + 20, ALLEGRO_ALIGN_CENTER, "%s fez %d pontos (Nível %d)", input_name, player.score, level);
         al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, SCREEN_H / 2 + 60, ALLEGRO_ALIGN_CENTER, "Pressione R --> Menu");
     }
 
@@ -517,10 +637,27 @@ int main() {
             if (state == STATE_PLAYING) {
                 if (key[ALLEGRO_KEY_LEFT] && player.x > 0) player.x -= PLAYER_SPEED;
                 if (key[ALLEGRO_KEY_RIGHT] && player.x < SCREEN_W - player.w) player.x += PLAYER_SPEED;
+                
+                // Disparo (espaco)
                 if (key[ALLEGRO_KEY_SPACE]) {
-                      fire_bullet();
+                      fire_standard_bullet();
                       key[ALLEGRO_KEY_SPACE] = false;
                 }
+
+                // Power Ups (1, 2, 3)
+                if (key[ALLEGRO_KEY_1]) {
+                    activate_powerup(1);
+                    key[ALLEGRO_KEY_1] = false; // Impede spam
+                }
+                if (key[ALLEGRO_KEY_2]) {
+                    activate_powerup(2);
+                    key[ALLEGRO_KEY_2] = false;
+                }
+                if (key[ALLEGRO_KEY_3]) {
+                    activate_powerup(3);
+                    key[ALLEGRO_KEY_3] = false;
+                }
+
                 logica();
             } 
             redraw = true;
@@ -528,30 +665,25 @@ int main() {
         else if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
             running = false;
         } 
-        // Tratamento de digitacao de texto
         else if (event.type == ALLEGRO_EVENT_KEY_CHAR) {
             if (state == STATE_INPUT_NAME) {
-                // Se apertar ENTER, valida o nome e começa o jogo
                 if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
-                    if (strlen(input_name) > 0) { // bloqueia caso nao tenha inserido o nome
+                    if (strlen(input_name) > 0) {
                         start_new_game();
                     }
                 }
-                // Se apertar ESC, volta
                 else if (event.keyboard.keycode == ALLEGRO_KEY_ESCAPE) {
                     state = STATE_MENU;
                 }
-                // Backspace (apagar)
                 else if (event.keyboard.keycode == ALLEGRO_KEY_BACKSPACE) {
                     if (input_pos > 0) {
                         input_pos--;
                         input_name[input_pos] = '\0';
                     }
                 }
-                // Caracteres imprimoveis
                 else {
                     char c = event.keyboard.unichar;
-                    if (input_pos < MAX_NAME_LEN && c >= 32 && c <= 126) { // ASCII imprimivel
+                    if (input_pos < MAX_NAME_LEN && c >= 32 && c <= 126) {
                         input_name[input_pos] = c;
                         input_pos++;
                         input_name[input_pos] = '\0';
@@ -572,7 +704,7 @@ int main() {
                     if (menu_option > 2) menu_option = 0;
                 }
                 else if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
-                    if (menu_option == 0) start_input_name(); // Vai para input nome
+                    if (menu_option == 0) start_input_name();
                     if (menu_option == 1) state = STATE_HIGHSCORES;
                     if (menu_option == 2) running = false;
                 }
@@ -590,7 +722,10 @@ int main() {
             }
         } 
         else if (event.type == ALLEGRO_EVENT_KEY_UP) {
-            if (event.keyboard.keycode != ALLEGRO_KEY_SPACE) {
+            if (event.keyboard.keycode != ALLEGRO_KEY_SPACE && 
+                event.keyboard.keycode != ALLEGRO_KEY_1 &&
+                event.keyboard.keycode != ALLEGRO_KEY_2 &&
+                event.keyboard.keycode != ALLEGRO_KEY_3) {
                 key[event.keyboard.keycode] = false;
             }
         }
