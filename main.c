@@ -3,6 +3,8 @@
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_ttf.h>
 #include <allegro5/allegro_image.h>
+#include <allegro5/allegro_audio.h>
+#include <allegro5/allegro_acodec.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,6 +68,10 @@
 #define FREEZE_DURATION 180   // tempo que os inimigos ficam comgelados (em frames)
 #define RAILGUN_VISUAL_TIME 15 // tempo de tela do laser
 
+// sons
+#define NUM_LEVEL_SOUNDS 15
+
+
 // Estados do Jogo
 typedef enum {
     STATE_MENU, 
@@ -125,14 +131,32 @@ typedef struct {
 Player player;
 Bullet bullets[MAX_BULLETS];
 Enemy enemies[ENEMY_ROWS][ENEMY_COLS];
+// Variaveis globais de sprites
 SpriteManager enemy_sprites;
 SpriteManager player_sprites;
 ExplosionSpriteManager explosion_sprites;
 Explosion explosions[MAX_EXPLOSIONS];
 ALLEGRO_BITMAP* background = NULL;
+ALLEGRO_BITMAP* logo = NULL;  // Adicione esta linha
+
+// Variaveis globais de movimento inimigos
 float enemy_dx = ENEMY_START_SPEED;
 int enemies_remaining;
 int level = 1; 
+
+// Variaveis globais de som
+ALLEGRO_SAMPLE *som_tiro = NULL;
+ALLEGRO_SAMPLE *som_power1 = NULL;
+ALLEGRO_SAMPLE *som_power2 = NULL;
+
+ALLEGRO_SAMPLE *sons_level[NUM_LEVEL_SOUNDS];
+ALLEGRO_AUDIO_STREAM *musica = NULL;
+// Som do menu
+ALLEGRO_SAMPLE *som_menu = NULL;
+ALLEGRO_SAMPLE *som_menu2 = NULL;
+ALLEGRO_SAMPLE *acabou = NULL;
+
+
 
 // Variaveis globais de Power Ups
 int freeze_timer = 0;        
@@ -232,6 +256,11 @@ bool init_background(const char* filename) {
     return (background != NULL);
 }
 
+bool init_logo(const char* filename) {
+    logo = al_load_bitmap(filename);
+    return (logo != NULL);
+}
+
 void reset_level() {
     player.x = SCREEN_W / 2 - player.w / 2;
     player.y = SCREEN_H - 60;
@@ -300,6 +329,15 @@ void spawn_bullet(float x, float y, float dx, float dy) {
             bullets[i].w = BULLET_W;
             bullets[i].h = BULLET_H;
             bullets[i].active = true;
+            
+            // Tocar som de tiro
+            if (som_tiro) {
+                // Gera um pitch aleatório entre 0.8 e 1.2
+                float pitch = 0.8f + ((float)rand() / RAND_MAX) * 0.4f;
+                al_play_sample(som_tiro, 0.5, 0.0, pitch, ALLEGRO_PLAYMODE_ONCE, NULL);
+               
+            }
+            
             break; 
         }
     }
@@ -330,7 +368,7 @@ void activate_powerup(int type) {
             // Definimos a area do tiro do player (uma linha vertical)
             float beam_x = railgun_x_pos;
             float beam_w = 10; // largura do feixe logico
-
+            al_play_sample(som_power1, 0.2, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
             for (int r = 0; r < ENEMY_ROWS; r++) {
                 for (int c = 0; c < ENEMY_COLS; c++) {
                     if (enemies[r][c].alive) {
@@ -352,6 +390,8 @@ void activate_powerup(int type) {
         if (player.energy >= COST_FREEZE) {
             player.energy -= COST_FREEZE;
             freeze_timer = FREEZE_DURATION;
+            al_play_sample(som_power2, 0.2, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+
         }
     }
 }
@@ -413,6 +453,16 @@ void draw_explosions() {
         if (explosions[i].active) {
             al_draw_bitmap(explosion_sprites.frames[explosions[i].current_frame], explosions[i].x, explosions[i].y, 0);
         }
+    }
+}
+
+void tocar_som_level_aleatorio() {
+    // Escolhe um índice aleatório
+    int indice = rand() % NUM_LEVEL_SOUNDS;
+    
+    // Toca o som se ele foi carregado
+    if (sons_level[indice]) {
+        al_play_sample(sons_level[indice], 0.8, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
     }
 }
 
@@ -483,16 +533,24 @@ void logica() {
             }
         }
 
-        if (game_over_trigger) {
-            add_score(player.score, input_name);
-            state = STATE_GAME_OVER;
+if (game_over_trigger) {
+    add_score(player.score, input_name);
+    state = STATE_GAME_OVER;
+    
+    // Toca de game over
+    if (acabou) {
+        al_play_sample(acabou, 0.5, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+              }
         }
     }
 
-    if (enemies_remaining == 0) {
-        level++; 
-        reset_level();
-    }
+    // Verifica se todos os inimigos foram destruídos
+
+if (enemies_remaining == 0) {
+    level++;
+    tocar_som_level_aleatorio(); // Toca som aleatório
+    reset_level();
+    }   
 }
 
 void graficos(ALLEGRO_FONT* font) {
@@ -504,8 +562,16 @@ void graficos(ALLEGRO_FONT* font) {
             0, 0, SCREEN_W, SCREEN_H, 0);
     }
 
-    if (state == STATE_MENU) {
-        al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W/2, 150, ALLEGRO_ALIGN_CENTER, "SPACE INVADERS");
+if (state == STATE_MENU) {
+        int logo_w = al_get_bitmap_width(logo);
+        int logo_h = al_get_bitmap_height(logo);
+        
+        // Centralizar a logo
+        float logo_x = (SCREEN_W - logo_w) / 2;
+        float logo_y = 60;  // Posição vertical
+        
+        al_draw_bitmap(logo, logo_x, logo_y, 0);
+  
         al_draw_text(font, (menu_option == 0) ? al_map_rgb(255, 255, 0) : al_map_rgb(255, 255, 255), SCREEN_W/2, 300, ALLEGRO_ALIGN_CENTER, "JOGAR");
         al_draw_text(font, (menu_option == 1) ? al_map_rgb(255, 255, 0) : al_map_rgb(255, 255, 255), SCREEN_W/2, 350, ALLEGRO_ALIGN_CENTER, "RECORDES");
         al_draw_text(font, (menu_option == 2) ? al_map_rgb(255, 255, 0) : al_map_rgb(255, 255, 255), SCREEN_W/2, 400, ALLEGRO_ALIGN_CENTER, "SAIR");
@@ -593,8 +659,10 @@ void graficos(ALLEGRO_FONT* font) {
     } else if (state == STATE_GAME_OVER) {
         al_draw_text(font, al_map_rgb(255, 0, 0), SCREEN_W / 2, SCREEN_H / 2 - 20, ALLEGRO_ALIGN_CENTER, "GAME OVER");
         al_draw_textf(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, SCREEN_H / 2 + 20, ALLEGRO_ALIGN_CENTER, "%s fez %d pontos (Nível %d)", input_name, player.score, level);
-        al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, SCREEN_H / 2 + 60, ALLEGRO_ALIGN_CENTER, "Pressione R --> Menu");
+        al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, SCREEN_H / 2 + 60, ALLEGRO_ALIGN_CENTER, "Pressione R --> Menu"); // não sei porque o comentario original do joão sumoiu
+
     }
+
 
     al_flip_display();
 }
@@ -616,10 +684,57 @@ int main() {
     al_register_event_source(queue, al_get_display_event_source(display));
     al_register_event_source(queue, al_get_timer_event_source(timer));
 
-    init_sprites("Alien-2.png", ENEMY_W, ENEMY_H);
-    init_spritess("Player.png", PLAYER_W, PLAYER_H);
-    init_explosion_sprites("ExplosionSetPRE2.png", ENEMY_W - 9, ENEMY_H - 9); 
-    init_background("Fundo.png"); 
+    init_sprites("imagens/Alien-2.png", ENEMY_W, ENEMY_H);
+    init_spritess("imagens/Player.png", PLAYER_W, PLAYER_H);
+    init_explosion_sprites("imagens/ExplosionSetPRE2.png", ENEMY_W - 9, ENEMY_H - 9); 
+    init_background("imagens/Fundo.png"); 
+    init_logo("imagens/logo1.png"); 
+    // Inicializar audio
+al_install_audio();
+al_init_acodec_addon();
+al_reserve_samples(8);
+
+// Carregar som de tiro
+som_tiro = al_load_sample("sons/tiro.wav");
+som_power1 = al_load_sample("sons/lase.wav");
+som_power2 = al_load_sample("sons/conge.wav");
+// Carregar sons de nivel
+sons_level[0] = al_load_sample("sons/level1.wav");
+sons_level[1] = al_load_sample("sons/level2.wav");
+sons_level[2] = al_load_sample("sons/level3.wav");
+sons_level[3] = al_load_sample("sons/level4.wav");
+sons_level[4] = al_load_sample("sons/level5.wav");
+sons_level[5] = al_load_sample("sons/level6.wav");
+sons_level[6] = al_load_sample("sons/level7.wav");
+sons_level[7] = al_load_sample("sons/level8.wav");
+sons_level[8] = al_load_sample("sons/level9.wav");
+sons_level[9] = al_load_sample("sons/level10.wav");
+sons_level[10] = al_load_sample("sons/level11.wav");
+sons_level[11] = al_load_sample("sons/level12.wav");
+sons_level[12] = al_load_sample("sons/level13.wav");
+sons_level[13] = al_load_sample("sons/level14.wav");
+sons_level[14] = al_load_sample("sons/level15.wav");
+
+
+musica = al_load_audio_stream("sons/musica_fundo1.wav", 4, 1024);
+
+som_menu = al_load_sample("sons/menu.wav");
+som_menu2 = al_load_sample("sons/menu2.wav");
+acabou = al_load_sample("sons/Acabo.wav");
+
+if(!musica) {
+    fprintf(stderr, "Falha ao carregar música!\n");
+} else {
+    // Anexar ao mixer padrão
+    al_attach_audio_stream_to_mixer(musica, al_get_default_mixer());
+    
+    // Configurar para repetir
+    al_set_audio_stream_playmode(musica, ALLEGRO_PLAYMODE_LOOP);
+    
+    // Ajustar volume (0.0 a 1.0)
+    al_set_audio_stream_gain(musica, 0.2);
+}
+
     
     load_scores();
     
@@ -695,19 +810,36 @@ int main() {
             key[event.keyboard.keycode] = true;
 
             if (state == STATE_MENU) {
-                if (event.keyboard.keycode == ALLEGRO_KEY_UP) {
-                    menu_option--;
-                    if (menu_option < 0) menu_option = 2;
-                }
-                else if (event.keyboard.keycode == ALLEGRO_KEY_DOWN) {
-                    menu_option++;
-                    if (menu_option > 2) menu_option = 0;
-                }
-                else if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
-                    if (menu_option == 0) start_input_name();
-                    if (menu_option == 1) state = STATE_HIGHSCORES;
-                    if (menu_option == 2) running = false;
-                }
+    if (event.keyboard.keycode == ALLEGRO_KEY_UP) {
+        menu_option--;
+        if (menu_option < 0) menu_option = 2;
+        
+        // Tocar som de navegação
+        if (som_menu) {
+            al_play_sample(som_menu, 0.3, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+        }
+    }
+    else if (event.keyboard.keycode == ALLEGRO_KEY_DOWN) {
+        menu_option++;
+        if (menu_option > 2) menu_option = 0;
+        
+        // Tocar som de navegação
+        if (som_menu) {
+            al_play_sample(som_menu, 0.3, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+        }
+    }
+else if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
+    // Tocar som de seleção (um pouco mais alto)
+    if (som_menu) {
+        al_play_sample(som_menu, 0.5, 0.0, 1.2, ALLEGRO_PLAYMODE_ONCE, NULL);
+        al_play_sample(som_menu2, 0.5, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+        // volume 0.5 e velocidade 1.2 (pitch mais agudo) para diferenciar
+    }
+    
+    if (menu_option == 0) start_input_name();
+    if (menu_option == 1) state = STATE_HIGHSCORES;
+    if (menu_option == 2) running = false;
+}
             }
             else if (state == STATE_HIGHSCORES) {
                 if (event.keyboard.keycode == ALLEGRO_KEY_ESCAPE || 
@@ -742,6 +874,21 @@ int main() {
     al_destroy_display(display);
     al_destroy_timer(timer);
     al_destroy_event_queue(queue);
+    al_destroy_sample(som_tiro);
+    al_destroy_audio_stream(musica);
+    al_destroy_sample(som_power1);
+    al_destroy_sample(som_power2);
+    al_destroy_sample(acabou);
 
+// Destruir som do menu
+if (som_menu) al_destroy_sample(som_menu);
+if (som_menu2) al_destroy_sample(som_menu2);
+
+    for (int i = 0; i < NUM_LEVEL_SOUNDS; i++) {
+        if (sons_level[i]) {
+            al_destroy_sample(sons_level[i]);
+        }
+    }
+    
     return 0;
 }
