@@ -332,8 +332,8 @@ void spawn_bullet(float x, float y, float dx, float dy) {
             
             // Tocar som de tiro
             if (som_tiro) {
-                // Gera um pitch aleatório entre 0.8 e 1.2
-                float pitch = 0.8f + ((float)rand() / RAND_MAX) * 0.4f;
+                // Gera um pitch aleatório entre 0.9 e 1.1
+                float pitch = 0.9f + ((float)rand() / RAND_MAX) * 0.2f;
                 al_play_sample(som_tiro, 0.5, 0.0, pitch, ALLEGRO_PLAYMODE_ONCE, NULL);
                
             }
