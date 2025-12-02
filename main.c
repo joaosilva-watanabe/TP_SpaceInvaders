@@ -60,23 +60,23 @@
 
 // configs power ups 
 #define MAX_ENERGY 100
-#define ENERGY_PER_KILL 5     // Quanto ganha por matar inimigo
+#define ENERGY_PER_KILL 5     
 #define COST_MULTISHOT 20
 #define COST_RAILGUN 50     
 #define COST_FREEZE 100
 
-#define FREEZE_DURATION 180   // tempo que os inimigos ficam comgelados (em frames)
-#define RAILGUN_VISUAL_TIME 15 // tempo de tela do laser
+#define FREEZE_DURATION 180   
+#define RAILGUN_VISUAL_TIME 15 
 
 // sons
 #define NUM_LEVEL_SOUNDS 15
-
 
 // Estados do Jogo
 typedef enum {
     STATE_MENU, 
     STATE_INPUT_NAME, 
     STATE_PLAYING, 
+    STATE_PAUSE,        
     STATE_GAME_OVER, 
     STATE_HIGHSCORES 
 } GameState;
@@ -89,7 +89,7 @@ typedef struct {
 // structs do jogo
 typedef struct {
     float x, y;
-    float dx, dy; // ajuste de angulo para os tiros multiplos
+    float dx, dy; 
     int w, h;
     bool active;
 } Bullet;
@@ -137,7 +137,7 @@ SpriteManager player_sprites;
 ExplosionSpriteManager explosion_sprites;
 Explosion explosions[MAX_EXPLOSIONS];
 ALLEGRO_BITMAP* background = NULL;
-ALLEGRO_BITMAP* logo = NULL;  // Adicione esta linha
+ALLEGRO_BITMAP* logo = NULL;  
 
 // Variaveis globais de movimento inimigos
 float enemy_dx = ENEMY_START_SPEED;
@@ -156,8 +156,6 @@ ALLEGRO_SAMPLE *som_menu = NULL;
 ALLEGRO_SAMPLE *som_menu2 = NULL;
 ALLEGRO_SAMPLE *acabou = NULL;
 
-
-
 // Variaveis globais de Power Ups
 int freeze_timer = 0;        
 int railgun_timer = 0;       
@@ -166,7 +164,8 @@ float railgun_x_pos = 0;
 // Variaveis de controle de estado e recordes
 GameState state = STATE_MENU;
 Record high_scores[MAX_HIGHSCORES]; 
-int menu_option = 0; 
+int menu_option = 0;
+int pause_option = 0; 
 
 // Variaveis para captura de nome
 char input_name[MAX_NAME_LEN + 1] = "";
@@ -332,19 +331,15 @@ void spawn_bullet(float x, float y, float dx, float dy) {
             
             // Tocar som de tiro
             if (som_tiro) {
-                // Gera um pitch aleatório entre 0.9 e 1.1
                 float pitch = 0.9f + ((float)rand() / RAND_MAX) * 0.2f;
                 al_play_sample(som_tiro, 0.5, 0.0, pitch, ALLEGRO_PLAYMODE_ONCE, NULL);
-               
             }
-            
             break; 
         }
     }
 }
 
 void fire_standard_bullet() {
-    // Tiro normal: centralizado e reto
     spawn_bullet(player.x + (player.w / 2) - (BULLET_W / 2), player.y, 0, -BULLET_SPEED);
 }
 
@@ -353,9 +348,9 @@ void activate_powerup(int type) {
         if (player.energy >= COST_MULTISHOT) {
             player.energy -= COST_MULTISHOT;
             float cx = player.x + (player.w / 2) - (BULLET_W / 2);
-            spawn_bullet(cx, player.y, 0, -BULLET_SPEED);      // Centro
-            spawn_bullet(cx, player.y, -2.0, -BULLET_SPEED);   // Esquerda
-            spawn_bullet(cx, player.y, 2.0, -BULLET_SPEED);    // Direita
+            spawn_bullet(cx, player.y, 0, -BULLET_SPEED);      
+            spawn_bullet(cx, player.y, -2.0, -BULLET_SPEED);   
+            spawn_bullet(cx, player.y, 2.0, -BULLET_SPEED);    
         }
     } 
     else if (type == 2) { // Rail Gun
@@ -364,15 +359,12 @@ void activate_powerup(int type) {
             railgun_timer = RAILGUN_VISUAL_TIME;
             railgun_x_pos = player.x + (player.w / 2);
 
-            // Logica de destruicao da coluna
-            // Definimos a area do tiro do player (uma linha vertical)
             float beam_x = railgun_x_pos;
-            float beam_w = 10; // largura do feixe logico
+            float beam_w = 10; 
             al_play_sample(som_power1, 0.2, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
             for (int r = 0; r < ENEMY_ROWS; r++) {
                 for (int c = 0; c < ENEMY_COLS; c++) {
                     if (enemies[r][c].alive) {
-                        // Verifica se o inimigo esta na linha horizontal do tiro
                         if (enemies[r][c].x < beam_x + beam_w && 
                             enemies[r][c].x + enemies[r][c].w > beam_x - beam_w) {
                             
@@ -391,7 +383,6 @@ void activate_powerup(int type) {
             player.energy -= COST_FREEZE;
             freeze_timer = FREEZE_DURATION;
             al_play_sample(som_power2, 0.2, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
-
         }
     }
 }
@@ -412,7 +403,6 @@ void update_explosions() {
 }
 
 void update_animation() {
-    // Se estiver congelado, nao atualiza animacao dos inimigos
     if (freeze_timer == 0) {
         enemy_sprites.frame_counter++;
         if (enemy_sprites.frame_counter >= ANIMATION_SPEED) {
@@ -457,10 +447,7 @@ void draw_explosions() {
 }
 
 void tocar_som_level_aleatorio() {
-    // Escolhe um índice aleatório
     int indice = rand() % NUM_LEVEL_SOUNDS;
-    
-    // Toca o som se ele foi carregado
     if (sons_level[indice]) {
         al_play_sample(sons_level[indice], 0.8, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
     }
@@ -470,13 +457,11 @@ void logica() {
     update_animation();
     update_explosions();
 
-    // Atualiza timers de powerups
     if (freeze_timer > 0) freeze_timer--;
     if (railgun_timer > 0) railgun_timer--;
 
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (bullets[i].active) {
-            // Atualiza posicao com dx e dy
             bullets[i].y += bullets[i].dy;
             bullets[i].x += bullets[i].dx;
 
@@ -493,7 +478,6 @@ void logica() {
                             bullets[i].active = false;
                             player.score += 10;
                             
-                            // Ganha energia
                             player.energy += ENERGY_PER_KILL;
                             if (player.energy > MAX_ENERGY) player.energy = MAX_ENERGY;
 
@@ -505,7 +489,6 @@ void logica() {
         }
     }
 
-    // Movimentacao dos inimigos (So move se nao estiver congelado)
     if (freeze_timer == 0) {
         bool touch_edge = false;
         bool game_over_trigger = false;
@@ -533,24 +516,77 @@ void logica() {
             }
         }
 
-if (game_over_trigger) {
-    add_score(player.score, input_name);
-    state = STATE_GAME_OVER;
-    
-    // Toca de game over
-    if (acabou) {
-        al_play_sample(acabou, 0.5, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
-              }
+        if (game_over_trigger) {
+            add_score(player.score, input_name);
+            state = STATE_GAME_OVER;
+            if (acabou) {
+                al_play_sample(acabou, 0.5, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+            }
         }
     }
 
-    // Verifica se todos os inimigos foram destruídos
-
-if (enemies_remaining == 0) {
-    level++;
-    tocar_som_level_aleatorio(); // Toca som aleatório
-    reset_level();
+    if (enemies_remaining == 0) {
+        level++;
+        tocar_som_level_aleatorio();
+        reset_level();
     }   
+}
+
+void draw_game_elements(ALLEGRO_FONT* font) {
+    al_draw_bitmap(player_sprites.frames[player_sprites.current_frame], player.x, player.y, 0);
+
+    for (int r = 0; r < ENEMY_ROWS; r++) {
+        for (int c = 0; c < ENEMY_COLS; c++) {
+            if (enemies[r][c].alive) {
+                if (enemy_sprites.spritesheet) {
+                    if (freeze_timer > 0) {
+                        al_draw_tinted_bitmap(enemy_sprites.frames[enemy_sprites.current_frame], 
+                                              COLOR_FREEZE, enemies[r][c].x, enemies[r][c].y, 0);
+                    } else {
+                        al_draw_bitmap(enemy_sprites.frames[enemy_sprites.current_frame], enemies[r][c].x, enemies[r][c].y, 0);
+                    }
+                } else {
+                    al_draw_filled_rectangle(enemies[r][c].x, enemies[r][c].y,
+                        enemies[r][c].x + enemies[r][c].w, enemies[r][c].y + enemies[r][c].h, COLOR_ENEMY);
+                }
+            }
+        }
+    }
+    
+    draw_explosions();
+    
+    if (railgun_timer > 0) {
+        al_draw_filled_rectangle(railgun_x_pos - 5, 0, railgun_x_pos + 5, player.y, COLOR_RAILGUN);
+        al_draw_rectangle(railgun_x_pos - 8, 0, railgun_x_pos + 8, player.y, al_map_rgba(255, 255, 255, 100), 2);
+    }
+
+    for (int i = 0; i < MAX_BULLETS; i++) {
+        if (bullets[i].active) {
+            al_draw_filled_rectangle(bullets[i].x, bullets[i].y, bullets[i].x + bullets[i].w, bullets[i].y + bullets[i].h, COLOR_BULLET);
+        }
+    }
+    
+    al_draw_multiline_textf(font, al_map_rgb(255, 255, 255), 10, 10, 800, al_get_font_line_height(font), 0, "Jogador: %s\n \nPontos: %d\n \nNível: %d", input_name, player.score, level);
+
+    al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, 10, ALLEGRO_ALIGN_CENTER, "[1] Multi (20)  [2] RailGun (50)  [3] Freeze (100)");
+
+    float bar_w = 150;
+    float bar_h = 20;
+    float bar_x = SCREEN_W - bar_w - 10;
+    float bar_y = 10;
+    
+    al_draw_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, al_map_rgb(255, 255, 255), 2);
+    
+    float fill_w = (float)player.energy / MAX_ENERGY * bar_w;
+    al_draw_filled_rectangle(bar_x, bar_y, bar_x + fill_w, bar_y + bar_h, COLOR_ENERGY_BAR);
+    
+    int font_h = al_get_font_line_height(font);
+    float text_y = bar_y + (bar_h - font_h) / 2;
+    
+    al_draw_textf(font, al_map_rgb(255, 255, 255), 
+                  bar_x + bar_w/2, 
+                  text_y, 
+                  ALLEGRO_ALIGN_CENTER, "%d/%d", player.energy, MAX_ENERGY);
 }
 
 void graficos(ALLEGRO_FONT* font) {
@@ -562,13 +598,12 @@ void graficos(ALLEGRO_FONT* font) {
             0, 0, SCREEN_W, SCREEN_H, 0);
     }
 
-if (state == STATE_MENU) {
+    if (state == STATE_MENU) {
         int logo_w = al_get_bitmap_width(logo);
         int logo_h = al_get_bitmap_height(logo);
         
-        // Centralizar a logo
         float logo_x = (SCREEN_W - logo_w) / 2;
-        float logo_y = 60;  // Posição vertical
+        float logo_y = 60;  
         
         al_draw_bitmap(logo, logo_x, logo_y, 0);
   
@@ -592,77 +627,28 @@ if (state == STATE_MENU) {
         al_draw_text(font, al_map_rgb(255, 255, 0), SCREEN_W/2, 500, ALLEGRO_ALIGN_CENTER, "Pressione ESC ou ENTER para voltar");
 
     } else if (state == STATE_PLAYING) {
-        al_draw_bitmap(player_sprites.frames[player_sprites.current_frame], player.x, player.y, 0);
+        draw_game_elements(font);
 
-        for (int r = 0; r < ENEMY_ROWS; r++) {
-            for (int c = 0; c < ENEMY_COLS; c++) {
-                if (enemies[r][c].alive) {
-                    if (enemy_sprites.spritesheet) {
-                        // Se estiver congelado, desenha com outra cor
-                        if (freeze_timer > 0) {
-                            al_draw_tinted_bitmap(enemy_sprites.frames[enemy_sprites.current_frame], 
-                                                  COLOR_FREEZE, enemies[r][c].x, enemies[r][c].y, 0);
-                        } else {
-                            al_draw_bitmap(enemy_sprites.frames[enemy_sprites.current_frame], enemies[r][c].x, enemies[r][c].y, 0);
-                        }
-                    } else {
-                        al_draw_filled_rectangle(enemies[r][c].x, enemies[r][c].y,
-                            enemies[r][c].x + enemies[r][c].w, enemies[r][c].y + enemies[r][c].h, COLOR_ENEMY);
-                    }
-                }
-            }
-        }
+    } else if (state == STATE_PAUSE) {
+        draw_game_elements(font);
         
-        draw_explosions();
+        al_draw_filled_rectangle(0, 0, SCREEN_W, SCREEN_H, al_map_rgba(0, 0, 0, 150));
         
-        // Desenha Laser da Rail Gun se ativo
-        if (railgun_timer > 0) {
-            al_draw_filled_rectangle(railgun_x_pos - 5, 0, railgun_x_pos + 5, player.y, COLOR_RAILGUN);
-            // Efeito de brilho externo
-            al_draw_rectangle(railgun_x_pos - 8, 0, railgun_x_pos + 8, player.y, al_map_rgba(255, 255, 255, 100), 2);
-        }
-
-        for (int i = 0; i < MAX_BULLETS; i++) {
-            if (bullets[i].active) {
-                al_draw_filled_rectangle(bullets[i].x, bullets[i].y, bullets[i].x + bullets[i].w, bullets[i].y + bullets[i].h, COLOR_BULLET);
-            }
-        }
+        al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W/2, 200, ALLEGRO_ALIGN_CENTER, "- PAUSE -");
         
-        // HUD - Infos Esquerda
-        al_draw_multiline_textf(font, al_map_rgb(255, 255, 255), 10, 10, 800, al_get_font_line_height(font), 0, "Jogador: %s\n \nPontos: %d\n \nNível: %d", input_name, player.score, level);
-
-        // HUD - Legenda Power Ups (Centro Superior)
-        al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, 10, ALLEGRO_ALIGN_CENTER, "[1] Multi (20)  [2] RailGun (50)  [3] Freeze (100)");
-
-        // HUD - Barra de Energia (Direita Superior)
-        float bar_w = 150;
-        float bar_h = 20;
-        float bar_x = SCREEN_W - bar_w - 10;
-        float bar_y = 10;
-        
-        // Borda da barra
-        al_draw_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, al_map_rgb(255, 255, 255), 2);
-        
-        // Preenchimento da barra baseado na energia 
-        float fill_w = (float)player.energy / MAX_ENERGY * bar_w;
-        al_draw_filled_rectangle(bar_x, bar_y, bar_x + fill_w, bar_y + bar_h, COLOR_ENERGY_BAR);
-        
-        // Texto sobre a barra
-        int font_h = al_get_font_line_height(font); // Pega a altura da fonte
-        float text_y = bar_y + (bar_h - font_h) / 2; // Calcula o centro vertical
-        
-        al_draw_textf(font, al_map_rgb(255, 255, 255), 
-                      bar_x + bar_w/2, 
-                      text_y, 
-                      ALLEGRO_ALIGN_CENTER, "%d/%d", player.energy, MAX_ENERGY);
+        al_draw_text(font, (pause_option == 0) ? al_map_rgb(255, 255, 0) : al_map_rgb(255, 255, 255), 
+                     SCREEN_W/2, 300, ALLEGRO_ALIGN_CENTER, "CONTINUAR");
+                     
+        al_draw_text(font, (pause_option == 1) ? al_map_rgb(255, 255, 0) : al_map_rgb(255, 255, 255), 
+                     SCREEN_W/2, 350, ALLEGRO_ALIGN_CENTER, "VOLTAR AO MENU");
+                     
+        al_draw_text(font, al_map_rgb(150, 150, 150), SCREEN_W/2, 500, ALLEGRO_ALIGN_CENTER, "Pressione P para voltar ao jogo");
 
     } else if (state == STATE_GAME_OVER) {
         al_draw_text(font, al_map_rgb(255, 0, 0), SCREEN_W / 2, SCREEN_H / 2 - 20, ALLEGRO_ALIGN_CENTER, "GAME OVER");
         al_draw_textf(font, al_map_rgb(255, 255, 255), SCREEN_W / 2, SCREEN_H / 2 + 20, ALLEGRO_ALIGN_CENTER, "%s fez %d pontos (Nível %d)", input_name, player.score, level);
-        al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, SCREEN_H / 2 + 60, ALLEGRO_ALIGN_CENTER, "Pressione R --> Menu"); // não sei porque o comentario original do joão sumoiu
-
+        al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W / 2, SCREEN_H / 2 + 60, ALLEGRO_ALIGN_CENTER, "Pressione R --> Menu"); 
     }
-
 
     al_flip_display();
 }
@@ -689,52 +675,43 @@ int main() {
     init_explosion_sprites("imagens/ExplosionSetPRE2.png", ENEMY_W - 9, ENEMY_H - 9); 
     init_background("imagens/Fundo.png"); 
     init_logo("imagens/logo1.png"); 
-    // Inicializar audio
-al_install_audio();
-al_init_acodec_addon();
-al_reserve_samples(8);
-
-// Carregar som de tiro
-som_tiro = al_load_sample("sons/tiro.wav");
-som_power1 = al_load_sample("sons/lase.wav");
-som_power2 = al_load_sample("sons/conge.wav");
-// Carregar sons de nivel
-sons_level[0] = al_load_sample("sons/level1.wav");
-sons_level[1] = al_load_sample("sons/level2.wav");
-sons_level[2] = al_load_sample("sons/level3.wav");
-sons_level[3] = al_load_sample("sons/level4.wav");
-sons_level[4] = al_load_sample("sons/level5.wav");
-sons_level[5] = al_load_sample("sons/level6.wav");
-sons_level[6] = al_load_sample("sons/level7.wav");
-sons_level[7] = al_load_sample("sons/level8.wav");
-sons_level[8] = al_load_sample("sons/level9.wav");
-sons_level[9] = al_load_sample("sons/level10.wav");
-sons_level[10] = al_load_sample("sons/level11.wav");
-sons_level[11] = al_load_sample("sons/level12.wav");
-sons_level[12] = al_load_sample("sons/level13.wav");
-sons_level[13] = al_load_sample("sons/level14.wav");
-sons_level[14] = al_load_sample("sons/level15.wav");
-
-
-musica = al_load_audio_stream("sons/musica_fundo1.wav", 4, 1024);
-
-som_menu = al_load_sample("sons/menu.wav");
-som_menu2 = al_load_sample("sons/menu2.wav");
-acabou = al_load_sample("sons/Acabo.wav");
-
-if(!musica) {
-    fprintf(stderr, "Falha ao carregar música!\n");
-} else {
-    // Anexar ao mixer padrão
-    al_attach_audio_stream_to_mixer(musica, al_get_default_mixer());
     
-    // Configurar para repetir
-    al_set_audio_stream_playmode(musica, ALLEGRO_PLAYMODE_LOOP);
-    
-    // Ajustar volume (0.0 a 1.0)
-    al_set_audio_stream_gain(musica, 0.2);
-}
+    al_install_audio();
+    al_init_acodec_addon();
+    al_reserve_samples(8);
 
+    som_tiro = al_load_sample("sons/tiro.wav");
+    som_power1 = al_load_sample("sons/lase.wav");
+    som_power2 = al_load_sample("sons/conge.wav");
+    sons_level[0] = al_load_sample("sons/level1.wav");
+    sons_level[1] = al_load_sample("sons/level2.wav");
+    sons_level[2] = al_load_sample("sons/level3.wav");
+    sons_level[3] = al_load_sample("sons/level4.wav");
+    sons_level[4] = al_load_sample("sons/level5.wav");
+    sons_level[5] = al_load_sample("sons/level6.wav");
+    sons_level[6] = al_load_sample("sons/level7.wav");
+    sons_level[7] = al_load_sample("sons/level8.wav");
+    sons_level[8] = al_load_sample("sons/level9.wav");
+    sons_level[9] = al_load_sample("sons/level10.wav");
+    sons_level[10] = al_load_sample("sons/level11.wav");
+    sons_level[11] = al_load_sample("sons/level12.wav");
+    sons_level[12] = al_load_sample("sons/level13.wav");
+    sons_level[13] = al_load_sample("sons/level14.wav");
+    sons_level[14] = al_load_sample("sons/level15.wav");
+
+    musica = al_load_audio_stream("sons/musica_fundo1.wav", 4, 1024);
+
+    som_menu = al_load_sample("sons/menu.wav");
+    som_menu2 = al_load_sample("sons/menu2.wav");
+    acabou = al_load_sample("sons/Acabo.wav");
+
+    if(!musica) {
+        fprintf(stderr, "Falha ao carregar música!\n");
+    } else {
+        al_attach_audio_stream_to_mixer(musica, al_get_default_mixer());
+        al_set_audio_stream_playmode(musica, ALLEGRO_PLAYMODE_LOOP);
+        al_set_audio_stream_gain(musica, 0.2);
+    }
     
     load_scores();
     
@@ -753,16 +730,14 @@ if(!musica) {
                 if (key[ALLEGRO_KEY_LEFT] && player.x > 0) player.x -= PLAYER_SPEED;
                 if (key[ALLEGRO_KEY_RIGHT] && player.x < SCREEN_W - player.w) player.x += PLAYER_SPEED;
                 
-                // Disparo (espaco)
                 if (key[ALLEGRO_KEY_SPACE]) {
                       fire_standard_bullet();
                       key[ALLEGRO_KEY_SPACE] = false;
                 }
 
-                // Power Ups (1, 2, 3)
                 if (key[ALLEGRO_KEY_1]) {
                     activate_powerup(1);
-                    key[ALLEGRO_KEY_1] = false; // Impede spam
+                    key[ALLEGRO_KEY_1] = false; 
                 }
                 if (key[ALLEGRO_KEY_2]) {
                     activate_powerup(2);
@@ -809,37 +784,56 @@ if(!musica) {
         else if (event.type == ALLEGRO_EVENT_KEY_DOWN) {
             key[event.keyboard.keycode] = true;
 
-            if (state == STATE_MENU) {
-    if (event.keyboard.keycode == ALLEGRO_KEY_UP) {
-        menu_option--;
-        if (menu_option < 0) menu_option = 2;
-        
-        // Tocar som de navegação
-        if (som_menu) {
-            al_play_sample(som_menu, 0.3, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
-        }
-    }
-    else if (event.keyboard.keycode == ALLEGRO_KEY_DOWN) {
-        menu_option++;
-        if (menu_option > 2) menu_option = 0;
-        
-        // Tocar som de navegação
-        if (som_menu) {
-            al_play_sample(som_menu, 0.3, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
-        }
-    }
-else if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
-    // Tocar som de seleção (um pouco mais alto)
-    if (som_menu) {
-        al_play_sample(som_menu, 0.5, 0.0, 1.2, ALLEGRO_PLAYMODE_ONCE, NULL);
-        al_play_sample(som_menu2, 0.5, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
-        // volume 0.5 e velocidade 1.2 (pitch mais agudo) para diferenciar
-    }
-    
-    if (menu_option == 0) start_input_name();
-    if (menu_option == 1) state = STATE_HIGHSCORES;
-    if (menu_option == 2) running = false;
-}
+            // --- CONTROLES COM ELSE IF PARA EVITAR CONFLITO (FALL-THROUGH) ---
+            if (state == STATE_PLAYING) {
+                if (event.keyboard.keycode == ALLEGRO_KEY_P) {
+                    state = STATE_PAUSE;
+                    al_set_audio_stream_playing(musica, false);
+                }
+            }
+            else if (state == STATE_PAUSE) {
+                if (event.keyboard.keycode == ALLEGRO_KEY_P) {
+                    state = STATE_PLAYING;
+                    al_set_audio_stream_playing(musica, true);
+                }
+                else if (event.keyboard.keycode == ALLEGRO_KEY_UP || event.keyboard.keycode == ALLEGRO_KEY_DOWN) {
+                    pause_option = !pause_option; 
+                    if(som_menu) al_play_sample(som_menu, 0.3, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+                }
+                else if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
+                    if (pause_option == 0) { // Continuar
+                        state = STATE_PLAYING;
+                        al_set_audio_stream_playing(musica, true);
+                    }
+                    else if (pause_option == 1) { // Voltar ao Menu
+                        state = STATE_MENU;
+                        menu_option = 0; // Reseta seleção do menu para o topo
+                        al_set_audio_stream_playing(musica, true); 
+                        reset_level(); 
+                    }
+                }
+            }
+            else if (state == STATE_MENU) {
+                if (event.keyboard.keycode == ALLEGRO_KEY_UP) {
+                    menu_option--;
+                    if (menu_option < 0) menu_option = 2;
+                    if (som_menu) al_play_sample(som_menu, 0.3, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+                }
+                else if (event.keyboard.keycode == ALLEGRO_KEY_DOWN) {
+                    menu_option++;
+                    if (menu_option > 2) menu_option = 0;
+                    if (som_menu) al_play_sample(som_menu, 0.3, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+                }
+                else if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
+                    if (som_menu) {
+                        al_play_sample(som_menu, 0.5, 0.0, 1.2, ALLEGRO_PLAYMODE_ONCE, NULL);
+                        al_play_sample(som_menu2, 0.5, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+                    }
+                    
+                    if (menu_option == 0) start_input_name();
+                    if (menu_option == 1) state = STATE_HIGHSCORES;
+                    if (menu_option == 2) running = false;
+                }
             }
             else if (state == STATE_HIGHSCORES) {
                 if (event.keyboard.keycode == ALLEGRO_KEY_ESCAPE || 
@@ -850,6 +844,7 @@ else if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
             else if (state == STATE_GAME_OVER) {
                 if (event.keyboard.keycode == ALLEGRO_KEY_R) {
                     state = STATE_MENU;
+                    menu_option = 0;
                 }
             }
         } 
@@ -870,6 +865,7 @@ else if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
 
     destroy_sprites();
     if (background) al_destroy_bitmap(background);
+    if (logo) al_destroy_bitmap(logo); 
     al_destroy_font(font);
     al_destroy_display(display);
     al_destroy_timer(timer);
@@ -880,9 +876,8 @@ else if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
     al_destroy_sample(som_power2);
     al_destroy_sample(acabou);
 
-// Destruir som do menu
-if (som_menu) al_destroy_sample(som_menu);
-if (som_menu2) al_destroy_sample(som_menu2);
+    if (som_menu) al_destroy_sample(som_menu);
+    if (som_menu2) al_destroy_sample(som_menu2);
 
     for (int i = 0; i < NUM_LEVEL_SOUNDS; i++) {
         if (sons_level[i]) {
