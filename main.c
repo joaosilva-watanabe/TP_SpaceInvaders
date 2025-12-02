@@ -81,9 +81,11 @@ typedef enum {
     STATE_HIGHSCORES 
 } GameState;
 
+// --- ALTERAÇÃO 1: Adicionado campo 'level' na struct ---
 typedef struct {
     char name[MAX_NAME_LEN + 1];
     int score;
+    int level; 
 } Record;
 
 // structs do jogo
@@ -180,6 +182,7 @@ void load_scores() {
     } else {
         for(int i=0; i<MAX_HIGHSCORES; i++) {
             high_scores[i].score = 0;
+            high_scores[i].level = 0; // Inicializa level como 0 para slots vazios
             sprintf(high_scores[i].name, "Vazio");
         }
     }
@@ -199,9 +202,11 @@ int compare_scores(const void *a, const void *b) {
     return (recB->score - recA->score);
 }
 
-void add_score(int score, const char* player_name) {
+// --- ALTERAÇÃO 2: Função recebe 'int level' ---
+void add_score(int score, int level_reached, const char* player_name) {
     if (score > high_scores[MAX_HIGHSCORES - 1].score) {
         high_scores[MAX_HIGHSCORES - 1].score = score;
+        high_scores[MAX_HIGHSCORES - 1].level = level_reached; // Salva o nível
         strncpy(high_scores[MAX_HIGHSCORES - 1].name, player_name, MAX_NAME_LEN);
         high_scores[MAX_HIGHSCORES - 1].name[MAX_NAME_LEN] = '\0'; 
         qsort(high_scores, MAX_HIGHSCORES, sizeof(Record), compare_scores);
@@ -517,7 +522,8 @@ void logica() {
         }
 
         if (game_over_trigger) {
-            add_score(player.score, input_name);
+            // --- ALTERAÇÃO 3: Passando o 'level' para a função de salvar ---
+            add_score(player.score, level, input_name);
             state = STATE_GAME_OVER;
             if (acabou) {
                 al_play_sample(acabou, 0.5, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
@@ -620,9 +626,13 @@ void graficos(ALLEGRO_FONT* font) {
 
     } else if (state == STATE_HIGHSCORES) {
         al_draw_text(font, al_map_rgb(255, 255, 255), SCREEN_W/2, 100, ALLEGRO_ALIGN_CENTER, "TOP 5 RECORDES");
+        al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W/2, 150, ALLEGRO_ALIGN_CENTER, "Rank   Nome          Nível   Pontos");
+        al_draw_text(font, al_map_rgb(200, 200, 200), SCREEN_W/2, 160, ALLEGRO_ALIGN_CENTER, "-----------------------------------");
+        
+        // --- ALTERAÇÃO 4: Exibição do nível na tela de recordes ---
         for(int i=0; i<MAX_HIGHSCORES; i++) {
             al_draw_textf(font, al_map_rgb(50, 255, 50), SCREEN_W/2, 200 + (i * 40), ALLEGRO_ALIGN_CENTER, 
-                          "%d. %-10s ..... %05d", i+1, high_scores[i].name, high_scores[i].score);
+                          "%d. %-10s  ...  Lvl %02d  ...  %05d", i+1, high_scores[i].name, high_scores[i].level, high_scores[i].score);
         }
         al_draw_text(font, al_map_rgb(255, 255, 0), SCREEN_W/2, 500, ALLEGRO_ALIGN_CENTER, "Pressione ESC ou ENTER para voltar");
 
@@ -638,10 +648,10 @@ void graficos(ALLEGRO_FONT* font) {
         
         al_draw_text(font, (pause_option == 0) ? al_map_rgb(255, 255, 0) : al_map_rgb(255, 255, 255), 
                      SCREEN_W/2, 300, ALLEGRO_ALIGN_CENTER, "CONTINUAR");
-                     
+                      
         al_draw_text(font, (pause_option == 1) ? al_map_rgb(255, 255, 0) : al_map_rgb(255, 255, 255), 
                      SCREEN_W/2, 350, ALLEGRO_ALIGN_CENTER, "VOLTAR AO MENU");
-                     
+                      
         al_draw_text(font, al_map_rgb(150, 150, 150), SCREEN_W/2, 500, ALLEGRO_ALIGN_CENTER, "Pressione P para voltar ao jogo");
 
     } else if (state == STATE_GAME_OVER) {
