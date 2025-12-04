@@ -47,11 +47,11 @@
 #define SPEED_INCREMENT 0.5 
 
 // animacao
-#define EXPLOSION_ANIMATION_SPEED 8
-#define NUM_EXPLOSION_FRAMES 7 
-#define MAX_EXPLOSIONS 10 
-#define ANIMATION_SPEED 20 
-#define NUM_FRAMES 2 
+#define EXPLOSION_ANIMATION_SPEED 8     // frames do jogo entre cada frame da animação
+#define NUM_EXPLOSION_FRAMES 7          // frames dos sprites da explosao
+#define MAX_EXPLOSIONS 10               // maximo de explosoes simultaneas
+#define ANIMATION_SPEED 20              // frames do jogo entre cada frame da animação
+#define NUM_FRAMES 2                    // máximo de frames por animação
 
 // configs high score
 #define MAX_HIGHSCORES 5
@@ -69,7 +69,7 @@
 #define RAILGUN_VISUAL_TIME 15 // tempo de tela do laser
 
 // sons
-#define NUM_LEVEL_SOUNDS 15
+#define NUM_LEVEL_SOUNDS 15             // Numero maximo de sons diferentes
 
 
 // Estados do Jogo
@@ -109,35 +109,36 @@ typedef struct {
 } Player;
 
 typedef struct {
-    ALLEGRO_BITMAP* spritesheet;
-    ALLEGRO_BITMAP* frames[NUM_FRAMES];
-    int current_frame;
-    int frame_counter;
-} SpriteManager;
+    ALLEGRO_BITMAP* spritesheet;             // Imagem completa com todos os frames
+    ALLEGRO_BITMAP* frames[NUM_FRAMES];      // Array com cada frame separado
+    int current_frame;                       // Frame atual da animação
+    int frame_counter;                       // Contador para controlar velocidade da animação
+} SpriteManager; 
 
 typedef struct {
-    float x, y;
-    int current_frame;
-    int frame_counter;
-    bool active;
+    float x, y;              // Posição onde a explosão está acontecendo
+    int current_frame;       // Qual frame da animação está exibindo agora
+    int frame_counter;       // Contador para controlar velocidade da animação
+    bool active;            
 } Explosion;
 
 typedef struct {
-    ALLEGRO_BITMAP* spritesheet;
-    ALLEGRO_BITMAP* frames[NUM_EXPLOSION_FRAMES];
+    ALLEGRO_BITMAP* spritesheet;                    
+    ALLEGRO_BITMAP* frames[NUM_EXPLOSION_FRAMES];   
 } ExplosionSpriteManager;
 
 // definicoes globais
 Player player;
 Bullet bullets[MAX_BULLETS];
 Enemy enemies[ENEMY_ROWS][ENEMY_COLS];
+
 // Variaveis globais de sprites
-SpriteManager enemy_sprites;
+SpriteManager enemy_sprites; 
 SpriteManager player_sprites;
 ExplosionSpriteManager explosion_sprites;
 Explosion explosions[MAX_EXPLOSIONS];
 ALLEGRO_BITMAP* background = NULL;
-ALLEGRO_BITMAP* logo = NULL;  // Adicione esta linha
+ALLEGRO_BITMAP* logo = NULL;  
 
 // Variaveis globais de movimento inimigos
 float enemy_dx = ENEMY_START_SPEED;
@@ -145,12 +146,12 @@ int enemies_remaining;
 int level = 1; 
 
 // Variaveis globais de som
-ALLEGRO_SAMPLE *som_tiro = NULL;
+ALLEGRO_SAMPLE *som_tiro = NULL;   // ALLEGRO_SAMPLE pois é um som curto e é carregado totalmente na memória
 ALLEGRO_SAMPLE *som_power1 = NULL;
 ALLEGRO_SAMPLE *som_power2 = NULL;
 
 ALLEGRO_SAMPLE *sons_level[NUM_LEVEL_SOUNDS];
-ALLEGRO_AUDIO_STREAM *musica = NULL;
+ALLEGRO_AUDIO_STREAM *musica = NULL;  // ALLEGRO_AUDIO_STREAM para músicas longas que são lidas em partes do disco
 // Som do menu
 ALLEGRO_SAMPLE *som_menu = NULL;
 ALLEGRO_SAMPLE *som_menu2 = NULL;
@@ -211,7 +212,20 @@ void add_score(int score, const char* player_name) {
 }
 
 // Funcoes de Inicializacao 
-bool init_sprites(const char* filename, int frame_width, int frame_height) {
+
+/**
+ * Inicializa sprites a partir de um ficheiro (spritesheet).
+ *
+ * Carrega a imagem especificada por 'filename' e divide-a em quadros de tamanho
+ * frame_width x frame_height, criando e inicializando as estruturas internas
+ * de sprite/frames usadas pela aplicação.
+ *
+ * return true Se o carregamento e inicialização foram bem-sucedidos.
+ * return false Se ocorreu um erro (ficheiro não encontrado, formato inválido,
+ *               dimensões incompatíveis, falha de alocação de memória, etc.).
+    */
+
+bool init_sprites(const char* filename, int frame_width, int frame_height) {  // 
     enemy_sprites.spritesheet = al_load_bitmap(filename);
     if (!enemy_sprites.spritesheet) return false;
 
@@ -221,8 +235,8 @@ bool init_sprites(const char* filename, int frame_width, int frame_height) {
         );
     }
     enemy_sprites.current_frame = 0;
-    enemy_sprites.frame_counter = 0;
-    return true;
+    enemy_sprites.frame_counter = 0; // false Se ocorreu um erro (ficheiro não encontrado, formato inválido, dimensões incompatíveis, falha de alocação de memória, etc.).
+    return true; // true Se o carregamento e inicialização foram bem-sucedidos.
 }
 
 bool init_spritess(const char* filename, int frame_width, int frame_height) {
@@ -251,7 +265,7 @@ bool init_explosion_sprites(const char* filename, int frame_width, int frame_hei
     return true;
 }
 
-bool init_background(const char* filename) {
+bool init_background(const char* filename) { 
     background = al_load_bitmap(filename);
     return (background != NULL);
 }
@@ -333,8 +347,8 @@ void spawn_bullet(float x, float y, float dx, float dy) {
             // Tocar som de tiro
             if (som_tiro) {
                 // Gera um pitch aleatório entre 0.9 e 1.1
-                float pitch = 0.9f + ((float)rand() / RAND_MAX) * 0.2f;
-                al_play_sample(som_tiro, 0.5, 0.0, pitch, ALLEGRO_PLAYMODE_ONCE, NULL);
+                float pitch = 0.9f + ((float)rand() / RAND_MAX) * 0.2f;  
+                al_play_sample(som_tiro, 0.5, 0.0, pitch, ALLEGRO_PLAYMODE_ONCE, NULL);      // Ajusta o volume e pitch
                
             }
             
@@ -368,7 +382,7 @@ void activate_powerup(int type) {
             // Definimos a area do tiro do player (uma linha vertical)
             float beam_x = railgun_x_pos;
             float beam_w = 10; // largura do feixe logico
-            al_play_sample(som_power1, 0.2, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+            al_play_sample(som_power1, 0.2, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);  // Som do powerup
             for (int r = 0; r < ENEMY_ROWS; r++) {
                 for (int c = 0; c < ENEMY_COLS; c++) {
                     if (enemies[r][c].alive) {
@@ -396,6 +410,7 @@ void activate_powerup(int type) {
     }
 }
 
+//  Percorre o array de 10 possíveis explosões simultâneas e atualiza apenas as que estão ativas.
 void update_explosions() {
     for (int i = 0; i < MAX_EXPLOSIONS; i++) {
         if (explosions[i].active) {
@@ -411,11 +426,16 @@ void update_explosions() {
     }
 }
 
+/** frame_counter conta de 0 até 19 
+* Quando chega em 20, troca de frame e reseta o contador
+* O operador % (módulo) faz o ciclo: 0, 1, 0, 1
+*/
+
 void update_animation() {
     // Se estiver congelado, nao atualiza animacao dos inimigos
     if (freeze_timer == 0) {
         enemy_sprites.frame_counter++;
-        if (enemy_sprites.frame_counter >= ANIMATION_SPEED) {
+        if (enemy_sprites.frame_counter >= ANIMATION_SPEED) { // ANIMATION_SPEED
             enemy_sprites.frame_counter = 0;
             enemy_sprites.current_frame = (enemy_sprites.current_frame + 1) % NUM_FRAMES;
         }
@@ -431,7 +451,7 @@ void update_animation() {
 bool colisao(float x1, float y1, int w1, int h1, float x2, float y2, int w2, int h2) {
     return (x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2);
 }
-
+// destroi sprites
 void destroy_sprites() {
     if (enemy_sprites.spritesheet) {
         for (int i = 0; i < NUM_FRAMES; i++) al_destroy_bitmap(enemy_sprites.frames[i]);
@@ -446,7 +466,7 @@ void destroy_sprites() {
         al_destroy_bitmap(explosion_sprites.spritesheet);
     }
 }
-
+// ele desenha todas as explosoes ativas na tela com base na sua posicao e frame atual usando a funcao al_draw_bitmap.
 void draw_explosions() {
     if (!explosion_sprites.spritesheet) return;
     for (int i = 0; i < MAX_EXPLOSIONS; i++) {
@@ -673,7 +693,7 @@ int main() {
     al_init_primitives_addon();
     al_init_font_addon();
     al_init_ttf_addon();
-    al_init_image_addon(); 
+    al_init_image_addon(); // Inicializa o addon de imagens que permite carregar PNGs e outros formatos
     
     ALLEGRO_DISPLAY* display = al_create_display(SCREEN_W, SCREEN_H);
     ALLEGRO_EVENT_QUEUE* queue = al_create_event_queue();
@@ -684,21 +704,24 @@ int main() {
     al_register_event_source(queue, al_get_display_event_source(display));
     al_register_event_source(queue, al_get_timer_event_source(timer));
 
+    // Carregando sprites na memoria
+
     init_sprites("imagens/Alien-2.png", ENEMY_W, ENEMY_H);
     init_spritess("imagens/Player.png", PLAYER_W, PLAYER_H);
     init_explosion_sprites("imagens/ExplosionSetPRE2.png", ENEMY_W - 9, ENEMY_H - 9); 
     init_background("imagens/Fundo.png"); 
     init_logo("imagens/logo1.png"); 
+
     // Inicializar audio
-al_install_audio();
-al_init_acodec_addon();
-al_reserve_samples(8);
+al_install_audio();  // Inicializa o sistema de áudio do Allegro
+al_init_acodec_addon(); // Permite carregar diferentes formatos: .wav, .ogg, .flac, .mp3 
+al_reserve_samples(8); // Reserva 8 canais de áudio para reprodução simultânea
 
 // Carregar som de tiro
 som_tiro = al_load_sample("sons/tiro.wav");
 som_power1 = al_load_sample("sons/lase.wav");
 som_power2 = al_load_sample("sons/conge.wav");
-// Carregar sons de nivel
+// Carregar sons de nivel no vetor de sons
 sons_level[0] = al_load_sample("sons/level1.wav");
 sons_level[1] = al_load_sample("sons/level2.wav");
 sons_level[2] = al_load_sample("sons/level3.wav");
@@ -715,9 +738,9 @@ sons_level[12] = al_load_sample("sons/level13.wav");
 sons_level[13] = al_load_sample("sons/level14.wav");
 sons_level[14] = al_load_sample("sons/level15.wav");
 
-
+// stream de musica de fundo
 musica = al_load_audio_stream("sons/musica_fundo1.wav", 4, 1024);
-
+// sons do menu e fim de jogo
 som_menu = al_load_sample("sons/menu.wav");
 som_menu2 = al_load_sample("sons/menu2.wav");
 acabou = al_load_sample("sons/Acabo.wav");
@@ -725,7 +748,7 @@ acabou = al_load_sample("sons/Acabo.wav");
 if(!musica) {
     fprintf(stderr, "Falha ao carregar música!\n");
 } else {
-    // Anexar ao mixer padrão
+    // Anexar ao mixer padrão, A música começa automaticamente após:
     al_attach_audio_stream_to_mixer(musica, al_get_default_mixer());
     
     // Configurar para repetir
@@ -867,7 +890,9 @@ else if (event.keyboard.keycode == ALLEGRO_KEY_ENTER) {
             redraw = false;
         }
     }
+    
 
+    // Liberar recursos da memoria
     destroy_sprites();
     if (background) al_destroy_bitmap(background);
     al_destroy_font(font);
