@@ -141,7 +141,7 @@ ExplosionSpriteManager explosion_sprites;
 Explosion explosions[MAX_EXPLOSIONS];
 ALLEGRO_BITMAP* background = NULL;
 ALLEGRO_BITMAP* logo = NULL;  
-ALLEGRO_BITMAP* logo = NULL;  
+
 
 // Variaveis globais de movimento inimigos
 float enemy_dx = ENEMY_START_SPEED;
@@ -354,9 +354,7 @@ void spawn_bullet(float x, float y, float dx, float dy) {
                 // Gera um pitch aleatório entre 0.9 e 1.1
                 float pitch = 0.9f + ((float)rand() / RAND_MAX) * 0.2f;  
                 al_play_sample(som_tiro, 0.5, 0.0, pitch, ALLEGRO_PLAYMODE_ONCE, NULL);      // Ajusta o volume e pitch
-               
-                float pitch = 0.9f + ((float)rand() / RAND_MAX) * 0.2f;
-                al_play_sample(som_tiro, 0.5, 0.0, pitch, ALLEGRO_PLAYMODE_ONCE, NULL);
+                
             }
             break; 
         }
@@ -385,8 +383,6 @@ void activate_powerup(int type) {
 
             float beam_x = railgun_x_pos;
             float beam_w = 10; // largura do feixe logico
-            al_play_sample(som_power1, 0.2, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);  // Som do powerup
-            float beam_w = 10; 
             al_play_sample(som_power1, 0.2, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
             for (int r = 0; r < ENEMY_ROWS; r++) {
                 for (int c = 0; c < ENEMY_COLS; c++) {
@@ -719,35 +715,7 @@ int main() {
 al_install_audio();  // Inicializa o sistema de áudio do Allegro
 al_init_acodec_addon(); // Permite carregar diferentes formatos: .wav, .ogg, .flac, .mp3 
 al_reserve_samples(8); // Reserva 8 canais de áudio para reprodução simultânea
-    
-    al_install_audio();
-    al_init_acodec_addon();
-    al_reserve_samples(8);
-
-    som_tiro = al_load_sample("sons/tiro.wav");
-    som_power1 = al_load_sample("sons/lase.wav");
-    som_power2 = al_load_sample("sons/conge.wav");
-    sons_level[0] = al_load_sample("sons/level1.wav");
-    sons_level[1] = al_load_sample("sons/level2.wav");
-    sons_level[2] = al_load_sample("sons/level3.wav");
-    sons_level[3] = al_load_sample("sons/level4.wav");
-    sons_level[4] = al_load_sample("sons/level5.wav");
-    sons_level[5] = al_load_sample("sons/level6.wav");
-    sons_level[6] = al_load_sample("sons/level7.wav");
-    sons_level[7] = al_load_sample("sons/level8.wav");
-    sons_level[8] = al_load_sample("sons/level9.wav");
-    sons_level[9] = al_load_sample("sons/level10.wav");
-    sons_level[10] = al_load_sample("sons/level11.wav");
-    sons_level[11] = al_load_sample("sons/level12.wav");
-    sons_level[12] = al_load_sample("sons/level13.wav");
-    sons_level[13] = al_load_sample("sons/level14.wav");
-    sons_level[14] = al_load_sample("sons/level15.wav");
-
-    musica = al_load_audio_stream("sons/musica_fundo1.wav", 4, 1024);
-
-    som_menu = al_load_sample("sons/menu.wav");
-    som_menu2 = al_load_sample("sons/menu2.wav");
-    acabou = al_load_sample("sons/Acabo.wav");
+   
 // Carregar som de tiro
 som_tiro = al_load_sample("sons/tiro.wav");
 som_power1 = al_load_sample("sons/lase.wav");
