@@ -2,8 +2,8 @@
 <br>
 
 ## Criadores:
-**Arthur Damasceno Dalvino
-Inácio Guimarães Oliveira
+**Arthur Damasceno Dalvino, 
+Inácio Guimarães Oliveira, 
 João Pedro Rodrigues da Silva**
 
 <br>
@@ -404,9 +404,10 @@ A visualização abaixo ilustra o fluxo completo da aplicação, detalhando os g
 
 <br>
 
+<img width="913" height="970" alt="diagrama" src="https://github.com/user-attachments/assets/fd80b252-64cf-449e-926a-bc2af3dba731" />
 
 
-![[diagrama.png]]<br>
+<br>
 <br>
 
 
